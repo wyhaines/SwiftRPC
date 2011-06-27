@@ -1,0 +1,41 @@
+SwiftRPC
+Kirk Haines
+2011
+
+SwiftRPC is an RPC implementation for Ruby apps. It leverages EventMachine to
+handle network communications, and will use MsgPack to serialize data across the
+wire if it is available.
+
+Features:
+
+* Should be performant. Use of EM allows for fast network communications, with
+  very high numbers of concurrent connectons, while MsgPack provides a very fast
+  marshalling protocol.
+
+* Dial-on-Demand. RPC objects do not need to maintain connections to each other
+  forever. They can allow connections to time out, and then reconnect them as
+  needed.
+
+* Automatic proxying. Instead of passing RPC objects themselves around, allow
+  proxy objects to be returned from RPC method calls. That is, if a method call
+  returns an object that is itself an RPC enabled object, that object will
+  persist in its original location, and a proxy will be returned instead.
+
+
+General workflow:
+
+class Foo
+  include Receiver
+
+  def square(n)
+    n * n
+  end
+end
+
+foo1 = Foo.new
+foo1.start_rpc_server(':10000')
+
+phone = Caller.new(':10000')
+
+puts phone.square(2)
+
