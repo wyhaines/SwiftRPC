@@ -22,7 +22,7 @@ Features:
   persist in its original location, and a proxy will be returned instead.
 
 
-General workflow:
+General workflow (thinking in code...this will no doubt change):
 
 class Foo
   include Receiver
