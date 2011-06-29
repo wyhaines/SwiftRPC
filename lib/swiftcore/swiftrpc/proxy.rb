@@ -19,12 +19,14 @@ module Swiftcore
 
       include UtilityMixins
 
-      attr_accessor :connected_callback, :disconnected_callback
+      attr_accessor :_connected_callback, :_disconnected_callback
 
 			def initialize(address, port, idle = 60)
         @address = address
         @port = port
         @idle = idle
+        @_connected_callback = []
+        @_disconnected_callback = []
         _p_make_connection
       end
 
