@@ -21,9 +21,9 @@ module Swiftcore
         server, port = _parse_address(addr)
         label ||= addr
         conn = Proxy.new(server, port, idle)
-        conn._connected_callback << connected_callback if connected_callback
-        conn._disconnected_callback << block if block
-        conn._disconnected_callback << disconnected_callback if disconnected_callback
+        conn._connected_callbacks << connected_callback if connected_callback
+        conn._disconnected_callbacks << block if block
+        conn._disconnected_callbacks << disconnected_callback if disconnected_callback
         @_connections[label] = conn
 			end
 
@@ -33,7 +33,7 @@ module Swiftcore
 
         conn.__send__(meth, *args)
       end
-      
+
 		end
 	end
 end

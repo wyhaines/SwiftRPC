@@ -1,9 +1,17 @@
+require 'em/deferrable
+'
 # This encapsulates the actual proxy connection. It is a module that is intended
 # to be used with EventMachine.
 
 module Swiftcore
 	module SwiftRPC
     module ProxyConnection
+      include EventMachine::Deferrable
+
+      def self.make_connection(*args, &block)
+        conn = EventMachine.connect(@address, @port, ProxyConnection, @idle)
+        conn.connected_callback
+      end
 
       def initialize(conn, *args)
         hash_args = Hash === args.first ? args.shift : {}
@@ -26,6 +34,9 @@ module Swiftcore
         @connected
       end
 
+      def invoke(meth, *args)
+        
+      end
     end
   end
 end

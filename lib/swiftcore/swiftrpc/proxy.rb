@@ -19,26 +19,27 @@ module Swiftcore
 
       include UtilityMixins
 
-      attr_accessor :_connected_callback, :_disconnected_callback
-
 			def initialize(address, port, idle = 60)
         @address = address
         @port = port
         @idle = idle
-        @_connected_callback = []
-        @_disconnected_callback = []
         _p_make_connection
       end
 
       def _p_make_connection
-        @proxy_connection = EventMachine.connect(ProxyConnection, @address, @port, @idle)
+        @proxy_connection = ProxyConnection.make_connection(@address, @port, @idle) do |conn|
+          @proxy_connection = conn
+          yield conn if block_given?
+        end
       end
 
       def _p_connected?
         @proxy_connection && @proxy_connection.connected?
       end
 
-			def method_missing(*args)
+			def method_missing(meth, *args)
+        _p_make_connection unless _p_connected?
+        @proxy_connection.invoke(meth, *args)
 			end
 		end
 	end
