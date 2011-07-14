@@ -17,30 +17,51 @@ module Swiftcore
 	module SwiftRPC
 		class Proxy < BlankSlate
 
+      attr_reader :connected_callbacks, :disconnected_callbacks
+      
       include UtilityMixins
 
 			def initialize(address, port, idle = 60)
-        @address = address
-        @port = port
-        @idle = idle
-        _p_make_connection
+        @__address = address
+        @__port = port
+        @__idle = idle
+        @__connected_callbacks = []
+        @__disconnected_callbacks = []
+        @__invocation_callbacks = {}
+        @__invocation_timestamps = {}
+        __p_make_connection
       end
 
-      def _p_make_connection
-        @proxy_connection = ProxyConnection.make_connection(@address, @port, @idle) do |conn|
-          @proxy_connection = conn
-          yield conn if block_given?
-        end
+      def __connection
+        @__proxy_connection
+      end
+
+      def __p_make_connection
+        @__proxy_connection = ProxyConnection.make_connection(@address, @port, @idle)
       end
 
       def _p_connected?
-        @proxy_connection && @proxy_connection.connected?
+        @__proxy_connection && @__proxy_connection.connected?
       end
 
 			def method_missing(meth, *args)
-        _p_make_connection unless _p_connected?
-        @proxy_connection.invoke(meth, *args)
-			end
+        if __p_connected?
+          @__proxy_connection.invoke_on(meth, *args)
+        else
+          __p_make_connection
+          @__proxy_connection.callback do
+            @__proxy_connection.invoke_on(meth, *args)
+          end
+        end
+      end
+
+      def __invoke_on(meth, *args)
+        signature = Swiftcore::Chord::UUID.generate(*([meth] + args))
+        @__invocation_callbacks[signature] = Fiber.current
+        @__invocation_timestamps[signature] = [EM.current_time, @__proxy_connection]
+        @__proxy_connection.on_invocation(self, signature, meth, *args)
+        Fiber.yield if SwiftRPC.fibers?
+      end
 		end
 	end
 end

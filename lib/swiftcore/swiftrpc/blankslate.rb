@@ -7,6 +7,9 @@ module Swiftcore
     #   or those which are matched by the regular expression in
     #   __MethodPreservationRegex. You may use these properties in order to
     #   make the slate selectively less blank, if needed.
+    #
+    # TODO: If 1.9.x is in use, make use of BasicObject? Need to think about that.
+    
     class BlankSlateTemplate
       @methods_to_preserve = []
 
