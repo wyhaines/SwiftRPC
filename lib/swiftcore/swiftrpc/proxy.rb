@@ -46,21 +46,26 @@ module Swiftcore
 
 			def method_missing(meth, *args)
         if __p_connected?
-          @__proxy_connection.invoke_on(meth, *args)
+          @__proxy_connection.__initiate_invocation(meth, *args)
         else
           __p_make_connection
           @__proxy_connection.callback do
-            @__proxy_connection.invoke_on(meth, *args)
+            @__proxy_connection.__initiate_invocation(meth, *args)
           end
         end
       end
 
-      def __invoke_on(meth, *args)
+      def __initiate_invocation(meth, *args)
         signature = Swiftcore::Chord::UUID.generate(*([meth] + args))
         @__invocation_callbacks[signature] = Fiber.current
         @__invocation_timestamps[signature] = [EM.current_time, @__proxy_connection]
-        @__proxy_connection.on_invocation(self, signature, meth, *args)
+        @__proxy_connection.invoke_on(self, signature, meth, *args)
         Fiber.yield if SwiftRPC.fibers?
+      end
+
+      def __handle_response(signature, response)
+        @__invocation_timestamps.delete(signature)
+        @__invocation_callbacks.delete(signature).resume(response) if @__invocation_callbacks.has_key?(signature)
       end
 		end
 	end

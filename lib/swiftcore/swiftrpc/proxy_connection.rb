@@ -18,6 +18,8 @@ module Swiftcore
         @address = hash_args[:address] || args[0]
         @port = hash_args[:port] || args[1]
         @idle = hash_args[:idle] || args[2] || 60
+        @return_map = {}
+        @buffer = ''
       end
 
       def post_init
@@ -110,12 +112,38 @@ module Swiftcore
         @connected
       end
 
-      def invoke(meth, *args)
-        # Create the data package and send it.
-        signature = Swiftcore::Chord::UUID.generate(*([meth] + args))
-        @invocation_callbacks[signature] = Fiber.current
-        node.on_invocation(self, signature, meth, *args)
-        Fiber.yield
+      def invoke_on(proxy, signature, meth, *args)
+        @return_map[signature] = proxy
+        payload = [meth, *args].to_msgpack
+        len = sprintf("%08x",payload)
+        send_data("#{len}:#{len}:#{payload}")
+      end
+
+      def receive_data data
+        @buffer << data
+        if @buffer.length > 18
+          if @buffer =~ /^([0-9a-fA-F]{8}):([0-9a-fA-F]{8}):/ && $1 == $2
+            len = $1.to_i(16)
+            @buffer.slice!(0,18)
+            signature, response = MessagePack.unpack(@buffer.slice!(0,len))
+            proxy = @return_map.delete(signature)
+            proxy.__handle_response(signature, response)
+          else
+            # The length and checksum isn't in the expected format, or do not match.
+            # What should be done here?  Scan the whole buffer looking
+            # for a match, or throw everything away? It may not be the prudent choice,
+            # but for now going with the scan first approach.
+            if (pos = @buffer =~ /([0-9a-fA-F]{8}):([0-9a-fA-F]{8}):/) && $1 == $2
+              @buffer.slice!(0,pos)
+              receive_data ''
+            else
+              # No matches in the whole thing. Throw it away!
+              @buffer = ''
+            end
+          end
+        end
+      rescue Exception
+        # Stuff blew up! Dang!
       end
     end
   end
