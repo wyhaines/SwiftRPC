@@ -2,8 +2,8 @@ require 'digest/sha1'
 
 module Swiftcore
 	module SwiftRPC
-    module UtilityMixins
-      # These are methods that may be mixed into more than once class.
+		module UtilityMixins
+			# These are methods that may be mixed into more than once class.
 
 			Epoch = 0x01B21DD213814000
 			TimeFormat = "%08x-%04x-%04x"
@@ -30,9 +30,9 @@ module Swiftcore
 				"#{time_string}-#{arg_string}-#{rand(RandHigh).to_s(16)}"
 			end
 
-      def _parse_address(addr)
+			def _parse_address(addr)
 				server, port = addr.split(/:/,2)
-        server = '127.0.0.1' if server.empty?
+				server = '127.0.0.1' if server.empty?
 				port = port.to_i
 				[server, port]
 			end
@@ -41,6 +41,6 @@ module Swiftcore
 				"#{server}:#{port}"
 			end
 
-    end
-  end
+		end
+	end
 end

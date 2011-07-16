@@ -1,12 +1,13 @@
 # Every valid target for RPC is a Receiver.
 require 'eventmachine'
 require 'swiftcore/swiftrpc/util'
+require 'swiftcore/swiftrpc/rpc_protocol'
 
 module Swiftcore
 	module SwiftRPC
 		module Receiver
 
-      include UtilityMixins
+			include UtilityMixins
 
 			@invocation_callbacks = {}
 			def self.invocation_callbacks
@@ -26,7 +27,7 @@ module Swiftcore
 				_receiver_bind_server, _receiver_bind_port = _parse_address(addr)
 				self._receiver_bind_address = _format_full_address(_receiver_bind_server, _receiver_bind_port)
 				self._receiver_em_signature = EventMachine.start_server(_receiver_bind_server, _receiver_bind_port, RPCProtocol, self)
-      end
+			end
 
 		end
 	end
