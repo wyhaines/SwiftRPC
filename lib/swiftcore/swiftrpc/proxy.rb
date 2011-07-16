@@ -12,12 +12,13 @@
 
 require 'swiftcore/swiftrpc/blankslate'
 require 'swiftcore/swiftrpc/util'
+require 'swiftcore/swiftrpc/proxy_connection'
 
 module Swiftcore
 	module SwiftRPC
 		class Proxy < BlankSlate
 
-			attr_reader :connected_callbacks, :disconnected_callbacks
+			attr_reader :connected_callbacks, :disconnected_callbacks, :__proxy_connection
 
 			include UtilityMixins
 
@@ -39,34 +40,35 @@ module Swiftcore
 			end
 
 			def __p_make_connection
-				@__proxy_connection = ProxyConnection.make_connection(@address, @port, @idle)
+				@__proxy_connection = ProxyConnection.make_connection(@__address, @__port, @__idle)
 			end
 
-			def _p_connected?
+			def __p_connected?
 				@__proxy_connection && @__proxy_connection.connected?
 			end
 
+			# The reconnect logic here is broken. It has a race condition.
 			def method_missing(meth, *args, &block)
 				if __p_connected?
 					if block
-						@__proxy_connection.__initiate_invocation(meth, *args) {|response| block.call(response) }
+						__initiate_invocation(meth, *args) {|response| block.call(response) }
 					else
-						@__proxy_connection.__initiate_invocation(meth, *args)
+						__initiate_invocation(meth, *args)
 					end
 				else
 					__p_make_connection
 					@__proxy_connection.callback do
 						if block
-							@__proxy_connection.__initiate_invocation(meth, *args) {|response| block.call(response)}
+							__initiate_invocation(meth, *args) {|response| block.call(response)}
 						else
-							@__proxy_connection.__initiate_invocation(meth, *args)
+							__initiate_invocation(meth, *args)
 						end
 					end
 				end
 			end
 
 			def __initiate_invocation(meth, *args, &block)
-				signature = Swiftcore::Chord::UUID.generate(*([meth] + args))
+				signature = generate_uuid(*([meth] + args))
 				@__invocation_timestamps[signature] = [EM.current_time, @__proxy_connection]
 				if block || !SwiftRPC.fibers?
 					@__invocation_callbacks[signature] = block ? block : NOP

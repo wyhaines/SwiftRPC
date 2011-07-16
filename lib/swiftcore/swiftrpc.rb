@@ -6,6 +6,7 @@ rescue LoadError
 	require 'swiftcore/swiftrpc/fauxmsgpack'
 end
 require 'swiftcore/swiftrpc/receiver'
+require 'swiftcore/swiftrpc/caller'
 
 module Swiftcore
 	module SwiftRPC

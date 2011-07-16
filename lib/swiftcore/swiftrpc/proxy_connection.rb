@@ -1,4 +1,5 @@
 require 'em/deferrable'
+
 # This encapsulates the actual proxy connection. It is a module that is intended
 # to be used with EventMachine.
 
@@ -8,19 +9,25 @@ module Swiftcore
 			include EventMachine::Deferrable
 
 			def self.make_connection(*args, &block)
-				conn = EventMachine.connect(@address, @port, ProxyConnection, @idle)
+				hash_args = Hash === args.first ? args.shift : {}
+				address = hash_args[:address] || args[0]
+				port = hash_args[:port] || args[1]
+				idle = hash_args[:idle] || args[2] || 60
+				conn = EventMachine.connect(address, port, ProxyConnection)
+			  conn.set_comm_inactivity_timeout(idle)
+			  conn
 			end
 
-			def initialize(conn, *args)
-				hash_args = Hash === args.first ? args.shift : {}
-				@connected = false
-				@address = hash_args[:address] || args[0]
-				@port = hash_args[:port] || args[1]
-				@idle = hash_args[:idle] || args[2] || 60
+			def initialize(*args)
 				@return_map = {}
 				@buffer = ''
+			  super
 			end
 
+			def cb
+				@callbacks
+			end
+			
 			def post_init
 				# Yay. A connection was established!
 				succeed
@@ -39,19 +46,18 @@ module Swiftcore
 				end
 			end
 
-			def connected_callbacks
-				@callbacks ||= []
+			def connected_callbacks block
+        return unless block
+        @deferred_status ||= :unknown
+        if @deferred_status == :succeeded
+          block.call(*@deferred_args)
+        elsif @deferred_status != :failed
+          @callbacks ||= []
+          @callbacks.unshift block # << block
+        end
 			end
 
-			def disconnected_callbacks
-				@disconnected_callbacks ||= []
-			end
-
-			def failed_callbacks
-				@errbacks ||= []
-			end
-
-			def disconnectback &block
+			def disconnected_callbacks block
 				return unless block
 				@deferred_status ||= :unknown
 				if @deferred_status == :disconnected
@@ -60,6 +66,29 @@ module Swiftcore
 					@disconnected_callbacks ||= []
 					@disconnected_callbacks.unshift block # << block
 				end
+			end
+
+			def failed_callbacks block
+        return unless block
+        @deferred_status ||= :unknown
+        if @deferred_status == :failed
+          block.call(*@deferred_args)
+        elsif @deferred_status != :succeeded
+          @errbacks ||= []
+          @errbacks.unshift block # << block
+        end
+			end
+
+			def callback &block
+				connected_callbacks block
+			end
+
+			def errback &block
+				failed_callbacks block
+			end
+			
+			def disconnectback &block
+				disconnected_callbacks block
 			end
 
 			def set_deferred_status status, *args
@@ -113,8 +142,8 @@ module Swiftcore
 
 			def invoke_on(proxy, signature, meth, *args)
 				@return_map[signature] = proxy
-				payload = [signature, meth, *args].to_msgpack
-				len = sprintf("%08x",payload)
+				payload = [signature, meth, args].to_msgpack
+				len = sprintf("%08x",payload.length)
 				send_data("#{len}:#{len}:#{payload}")
 			end
 
@@ -124,7 +153,7 @@ module Swiftcore
 					if @buffer =~ /^([0-9a-fA-F]{8}):([0-9a-fA-F]{8}):/ && $1 == $2
 						len = $1.to_i(16)
 						@buffer.slice!(0,18)
-						signature, response = MessagePack.unpack(@buffer.slice!(0,len))
+						signature, response = ::MessagePack.unpack(@buffer.slice!(0,len))
 						proxy = @return_map.delete(signature)
 						proxy.__handle_response(signature, response)
 					else
@@ -141,7 +170,8 @@ module Swiftcore
 						end
 					end
 				end
-			rescue Exception
+			rescue Exception =>e
+				puts e, e.backtrace.inspect
 				# Stuff blew up! Dang!
 			end
 		end

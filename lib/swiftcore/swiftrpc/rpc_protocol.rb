@@ -5,7 +5,8 @@ module Swiftcore
 	module SwiftRPC
 		module RPCProtocol
 
-			def initialize(*args)
+			def initialize(receiver)
+				@receiver = receiver
 				@__buffer = ''
 				@transaction_log = {}
 				super
@@ -20,9 +21,9 @@ module Swiftcore
 						@__buffer.slice!(0,18)
 						signature, meth, args = MessagePack.unpack(@__buffer.slice!(0,len))
 						@transaction_log[signature] = [[EventMachine.current_time, :received]]
-						response = __send__(meth, *args)
+						response = @receiver.__send__(meth, *args)
 						payload = [signature, response].to_msgpack
-						len = payload.length
+						len = sprintf("%08x",payload.length)
 						send_data("#{len}:#{len}:#{payload}")
 
 						@transaction_log.delete signature
@@ -41,7 +42,8 @@ module Swiftcore
 						end
 					end
 				end
-			rescue Exception
+			rescue Exception => e
+								puts e, e.backtrace.inspect
 				# Stuff blew up! Dang!
 			end
 

@@ -1,4 +1,4 @@
-require "swiftcore/swiftrpc/receiver"
+require "swiftcore/swiftrpc"
 
 class TestRPC
 	include Swiftcore::SwiftRPC::Receiver

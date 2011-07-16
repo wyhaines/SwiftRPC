@@ -1,6 +1,7 @@
 # Every object which will make RPC calls is a Caller.
 require 'eventmachine'
 require 'swiftcore/swiftrpc/util'
+require 'swiftcore/swiftrpc/proxy'
 
 module Swiftcore
 	module SwiftRPC
@@ -21,23 +22,29 @@ module Swiftcore
 				server, port = _parse_address(addr)
 				label ||= addr
 				conn = Proxy.new(server, port, idle)
-				conn._connection.connected_callbacks << connected_callback if connected_callback
-				conn._connection.errback do
+				conn.__proxy_connection.connected_callbacks block if block
+				conn.__proxy_connection.connected_callbacks connected_callback if connected_callback
+				conn.__proxy_connection.errback do
 					# The connection failed before being established. Something should be done here.
 					# A exception inside a callback has limited utility. There should probably be some
 					# sort of limited retry logic, and some sort of indicator mechanism to show that
 					# this connection failed.
 				end
-				conn._connection.disconnected_callbacks << block if block
-				conn._connecton.disconnected_callbacks << disconnected_callback if disconnected_callback
+
+				conn._connecton.disconnected_callbacks disconnected_callback if disconnected_callback
 				@_connections[label] = conn
 			end
 
-			def call_on(label, meth, *args)
+			def call_on(label, meth, *args, &block)
 				conn = @_connections[label]
 				raise "A connection for '#{label}' could not be found." unless conn
 
-				conn.__send__(meth, *args)
+				if block
+					conn.__send__(meth, *args) {|*response| block.call(*response)}
+				else
+				  conn.__send__(meth, *args)
+				end
+
 			end
 
 		end
