@@ -50,19 +50,11 @@ module Swiftcore
 			# The reconnect logic here is broken. It has a race condition.
 			def method_missing(meth, *args, &block)
 				if __p_connected?
-					if block
-						__initiate_invocation(meth, *args) {|response| block.call(response) }
-					else
-						__initiate_invocation(meth, *args)
-					end
+					__initiate_invocation(meth, *args, &block)
 				else
 					__p_make_connection
 					@__proxy_connection.callback do
-						if block
-							__initiate_invocation(meth, *args) {|response| block.call(response)}
-						else
-							__initiate_invocation(meth, *args)
-						end
+					__initiate_invocation(meth, *args, &block)
 					end
 				end
 			end

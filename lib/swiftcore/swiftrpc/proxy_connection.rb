@@ -142,18 +142,40 @@ module Swiftcore
 
 			def invoke_on(proxy, signature, meth, *args)
 				@return_map[signature] = proxy
-				payload = [signature, meth, args].to_msgpack
+				payload = [signature, meth, args]
+				flavor = args.respond_to?(:to_msgpack) ? :msgpack : :marshal
+				begin
+					case flavor
+						when :msgpack
+					    payload = payload.to_msgpack
+						else
+					    payload = Marshal.dump(payload)
+					end
+				rescue NoMethodError
+					flavor = :marshal
+					payload = Marshal.dump(payload)
+				end
+
 				len = sprintf("%08x",payload.length)
-				send_data("#{len}:#{len}:#{payload}")
+				send_data("#{flavor}:#{len}:#{len}:#{payload}")
 			end
 
 			def receive_data data
 				@buffer << data
-				if @buffer.length > 18
-					if @buffer =~ /^([0-9a-fA-F]{8}):([0-9a-fA-F]{8}):/ && $1 == $2
-						len = $1.to_i(16)
-						@buffer.slice!(0,18)
-						signature, response = ::MessagePack.unpack(@buffer.slice!(0,len))
+				while @buffer.length > 26
+					if @buffer =~ /^(\w{7}):([0-9a-fA-F]{8}):([0-9a-fA-F]{8}):/ && $2 == $3
+						flavor = $1.intern
+						len = $2.to_i(16)
+						@buffer.slice!(0,26)
+						data = @buffer.slice!(0,len)
+
+						case flavor
+							when :msgpack
+						    signature, response = ::MessagePack.unpack(data)
+							else
+						    signature, response = Marshal.load(data)
+						end
+
 						proxy = @return_map.delete(signature)
 						proxy.__handle_response(signature, response)
 					else

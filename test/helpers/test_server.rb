@@ -6,6 +6,18 @@ class TestRPC
 	def seven
 		7
 	end
+
+	def square(n)
+		n*2
+	end
+
+	def squareroot(n)
+		Math.sqrt(n)
+	end
+
+  def not_packable_array
+	  [1, 2, Exception.new, 4]
+  end
 end
 
 EventMachine.run {

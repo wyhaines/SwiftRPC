@@ -15,16 +15,47 @@ module Swiftcore
 			# TODO: Insert an Ack into this protocol to make it more robust.
 			def receive_data data
 				@__buffer << data
-				if @__buffer.length > 18
-					if @__buffer =~ /^([0-9a-fA-F]{8}):([0-9a-fA-F]{8}):/ && $1 == $2
-						len = $1.to_i(16)
-						@__buffer.slice!(0,18)
-						signature, meth, args = MessagePack.unpack(@__buffer.slice!(0,len))
+				while @__buffer.length > 26
+					if @__buffer =~ /^(\w{7}):([0-9a-fA-F]{8}):([0-9a-fA-F]{8}):/ && $2 == $3
+						flavor = $1.intern
+						len = $2.to_i(16)
+						@__buffer.slice!(0,26)
+						payload = @__buffer.slice!(0,len)
+
+						case flavor
+							when :msgpack
+						    signature, meth, args = ::MessagePack.unpack(payload)
+							else
+						    signature, meth, args = Marshal.load(payload)
+						end
+						
 						@transaction_log[signature] = [[EventMachine.current_time, :received]]
-						response = @receiver.__send__(meth, *args)
-						payload = [signature, response].to_msgpack
+						begin
+							response = @receiver.__send__(meth, *args)
+						rescue Exception => e
+							response = e
+						end
+						payload = [signature, response]
+						if response.respond_to?(:to_msgpack)
+							flavor = :msgpack
+						else
+						  flavor = :marshal
+						end
+
+						begin
+							case flavor
+								when :msgpack
+							    payload = payload.to_msgpack
+								else :marshal
+							    payload = Marshal.dump(payload)
+							end
+						rescue NoMethodError
+							flavor = :marshal
+							payload = Marshal.dump(payload)
+						end
+
 						len = sprintf("%08x",payload.length)
-						send_data("#{len}:#{len}:#{payload}")
+						send_data("#{flavor}:#{len}:#{len}:#{payload}")
 
 						@transaction_log.delete signature
 						#@transaction_log[signature] << [EventMachine.current_time, :sent]
@@ -42,9 +73,6 @@ module Swiftcore
 						end
 					end
 				end
-			rescue Exception => e
-								puts e, e.backtrace.inspect
-				# Stuff blew up! Dang!
 			end
 
 		end

@@ -39,12 +39,7 @@ module Swiftcore
 				conn = @_connections[label]
 				raise "A connection for '#{label}' could not be found." unless conn
 
-				if block
-					conn.__send__(meth, *args) {|*response| block.call(*response)}
-				else
-				  conn.__send__(meth, *args)
-				end
-
+				conn.__send__(meth, *args, &block)
 			end
 
 		end
