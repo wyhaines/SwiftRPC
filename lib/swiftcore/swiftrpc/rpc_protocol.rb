@@ -1,14 +1,19 @@
 # This encapsulates the RPCserver protocol. It is a module that is intended
 # to be used with EventMachine.
+require 'swiftcore/swiftrpc/util'
+require 'swiftcore/swiftrpc/always_proxy'
+require 'swiftcore/swiftrpc/do_proxy'
 
 module Swiftcore
 	module SwiftRPC
 		module RPCProtocol
-
+			include UtilityMixins
+			
 			def initialize(receiver)
 				@receiver = receiver
 				@__buffer = ''
 				@transaction_log = {}
+				@proxy_objects = {}
 				super
 			end
 
@@ -30,12 +35,23 @@ module Swiftcore
 						end
 						
 						@transaction_log[signature] = [[EventMachine.current_time, :received]]
+						
 						begin
 							response = @receiver.__send__(meth, *args)
 						rescue Exception => e
 							response = e
 						end
-						payload = [signature, response]
+
+						# Handle proxies for objects. The hard part with a proxy is that we need to keep the original object alive
+						# locally until the proxy goes away at the other end. At that time, the original object can be released.
+						if response.is_a?(Receiver) || response.is_a?(AlwaysProxy)
+							proxy_uuid = generate_uuid
+							@proxy_objects[proxy_uuid] = response
+							payload = [signature, DoProxy.new(proxy_uuid)]
+						else
+							payload = [signature, response]
+						end
+						
 						if response.respond_to?(:to_msgpack)
 							flavor = :msgpack
 						else
@@ -74,6 +90,10 @@ module Swiftcore
 					end
 				end
 			end
+
+		  def __proxy_is_finalized(uuid)
+			  @proxy_objects.delete(uuid) ? true : false
+		  end
 
 		end
 	end

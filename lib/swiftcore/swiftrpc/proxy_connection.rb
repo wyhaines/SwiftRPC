@@ -1,4 +1,5 @@
 require 'em/deferrable'
+require 'swiftcore/swiftrpc/do_proxy'
 
 # This encapsulates the actual proxy connection. It is a module that is intended
 # to be used with EventMachine.
@@ -127,6 +128,10 @@ module Swiftcore
 			end
 			alias set_deferred_disconnect disconnect
 
+			def notify_of_finalization(finalization_signature, uuid)
+				invoke_on(nil, finalization_signature, :__proxy_is_finalized, uuid)
+			end
+
 			def connection_completed
 				comm_inactivity_timeout = @idle
 				@connected = true
@@ -176,8 +181,11 @@ module Swiftcore
 						    signature, response = Marshal.load(data)
 						end
 
+						if DoProxy === response
+							
+						end
 						proxy = @return_map.delete(signature)
-						proxy.__handle_response(signature, response)
+						proxy.__handle_response(signature, response) if proxy
 					else
 						# The length and checksum isn't in the expected format, or do not match.
 						# What should be done here?  Scan the whole buffer looking

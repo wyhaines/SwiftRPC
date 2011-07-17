@@ -42,6 +42,10 @@ module Swiftcore
 				conn.__send__(meth, *args, &block)
 			end
 
+		  def on(label)
+			  @_connections[label]
+		  end
+
 		end
 	end
 end

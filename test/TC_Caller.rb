@@ -74,6 +74,21 @@ class TC_Caller < Test::Unit::TestCase
 				end
 			end
 
+			EM::add_timer(1) do
+				tx.on('test').seven do |num|
+					tests_finished[:seven_again] = true
+					assert_equal(7,num, "The response received was not what was expected.")
+				end
+			end
+
+			EM::add_timer(1) do
+				test = tx.on('test')
+				test.seven do |num|
+					tests_finished[:seven_again_too] = true
+					assert_equal(7,num, "The response received was not what was expected.")
+				end
+			end
+
 			# Trigger an exception by calling a method that does not exist; exception should propagate back to the caller.
 			EM::add_timer(3) { EM.stop_event_loop }
 		}
@@ -82,6 +97,8 @@ class TC_Caller < Test::Unit::TestCase
 		assert tests_finished[:connected_5557], "Did not receive affirmation that the client connected to the node2 server."
 		assert tests_finished[:connected_5558], "Did not receive affirmation that the client connected to the node3 server."
 		assert tests_finished[:seven], "The \"seven\" test did not finish."
+		assert tests_finished[:seven_again], "The \"seven again\" test did not finish."
+		assert tests_finished[:seven_again_too], "The \"seven again too\" test did not finish."
 		assert tests_finished[:eight], "The \"eight\" test did not finish."
 	end
 

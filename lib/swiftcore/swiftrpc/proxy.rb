@@ -16,15 +16,17 @@ require 'swiftcore/swiftrpc/proxy_connection'
 
 module Swiftcore
 	module SwiftRPC
+		BlankSlateTemplate::__MethodsToPreserve << :class
+
 		class Proxy < BlankSlate
 
-			attr_reader :connected_callbacks, :disconnected_callbacks, :__proxy_connection
+			attr_reader :connected_callbacks, :disconnected_callbacks, :__proxy_connection, :__remote_uuid
 
 			include UtilityMixins
 
 			NOP = Proc.new {}
 
-			def initialize(address, port, idle = 60)
+			def initialize(address, port, idle = 60, remote_uuid = nil)
 				@__address = address
 				@__port = port
 				@__idle = idle
@@ -33,6 +35,14 @@ module Swiftcore
 				@__invocation_callbacks = {}
 				@__invocation_timestamps = {}
 				__p_make_connection
+
+			  ObjectSpace.define_finalizer( self, self.class.finalize(@__proxy_connection, generate_uuid(remote_uuid), remote_uuid) )
+			end
+
+			def self.finalize(conn, finalization_signature, uuid)
+				Proc.new do
+					conn.notify_of_finalization(finalization_signature, uuid)
+				end
 			end
 
 			def __connection
@@ -47,7 +57,7 @@ module Swiftcore
 				@__proxy_connection && @__proxy_connection.connected?
 			end
 
-			# The reconnect logic here is broken. It has a race condition.
+			# TODO: The reconnect logic here is broken. It has a race condition. Fix it.
 			def method_missing(meth, *args, &block)
 				if __p_connected?
 					__initiate_invocation(meth, *args, &block)
