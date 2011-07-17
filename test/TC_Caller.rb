@@ -12,7 +12,11 @@ class TC_Caller < Test::Unit::TestCase
 
 	def setup
 		cwd = File.dirname(__FILE__)
-		KillQueue << SwiftcoreTestSupport::create_process(:dir => cwd, :cmd => "#{Ruby} -I#{cwd}/../lib #{cwd}/helpers/test_server.rb")
+		ruby_cmd = "#{Ruby} -I#{cwd}/../lib"
+		KillQueue << SwiftcoreTestSupport::create_process(:dir => cwd, :cmd => "#{ruby_cmd} #{cwd}/helpers/test_server.rb")
+		KillQueue << SwiftcoreTestSupport::create_process(:dir => cwd, :cmd => "#{ruby_cmd} #{cwd}/helpers/test_node.rb a 1 5556")
+		KillQueue << SwiftcoreTestSupport::create_process(:dir => cwd, :cmd => "#{ruby_cmd} #{cwd}/helpers/test_node.rb b 2 5557")
+		KillQueue << SwiftcoreTestSupport::create_process(:dir => cwd, :cmd => "#{ruby_cmd} #{cwd}/helpers/test_node.rb c 3 5558")
 	  sleep 1
 	end
 
@@ -27,7 +31,11 @@ class TC_Caller < Test::Unit::TestCase
 		tests_finished = {}
 		EventMachine.run {
 			tx = TestCaller.new
-			tx.connect_to('127.0.0.1:5555','test') { tests_finished[:connected] = true }
+			tx.connect_to('127.0.0.1:5555','test') { tests_finished[:connected_5555] = true }
+			tx.connect_to('127.0.0.1:5556','node1') { tests_finished[:connected_5556] = true }
+			tx.connect_to('127.0.0.1:5557','node2') { tests_finished[:connected_5557] = true }
+			tx.connect_to('127.0.0.1:5558','node3') { tests_finished[:connected_5558] = true }
+
 			# Trivial request; gets back a basic object for a response.
 			EM::add_timer(1) do
 				tx.call_on('test', :seven) do |num|
@@ -51,10 +59,28 @@ class TC_Caller < Test::Unit::TestCase
 					assert_equal(Exception, response[2].class, "The response should have contained an exception, but it appears not to.")
 				end
 			end
+
+			EM::add_timer(1) do
+				tx.call_on('node1', :ref) do |node1_ref|
+					puts "got 1"
+				end
+
+				tx.call_on('node2', :ref) do |node1_ref|
+					puts "got 2"
+				end
+
+				tx.call_on('node3', :ref) do |node1_ref|
+					puts "got 3"
+				end
+			end
+
 			# Trigger an exception by calling a method that does not exist; exception should propagate back to the caller.
 			EM::add_timer(3) { EM.stop_event_loop }
 		}
-		assert tests_finished[:connected], "Did not receive affirmation that the client connected to the server."
+		assert tests_finished[:connected_5555], "Did not receive affirmation that the client connected to the general test server."
+		assert tests_finished[:connected_5556], "Did not receive affirmation that the client connected to the node1 server."
+		assert tests_finished[:connected_5557], "Did not receive affirmation that the client connected to the node2 server."
+		assert tests_finished[:connected_5558], "Did not receive affirmation that the client connected to the node3 server."
 		assert tests_finished[:seven], "The \"seven\" test did not finish."
 		assert tests_finished[:eight], "The \"eight\" test did not finish."
 	end
