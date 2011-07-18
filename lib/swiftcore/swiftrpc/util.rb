@@ -26,7 +26,7 @@ module Swiftcore
 				t3 = t3 | 0b0001_0000_0000_0000
 
 				time_string = TimeFormat % [t1,t2,t3]
-				arg_string = Digest::SHA1.hexdigest(args.collect {|arg| arg.to_s}.sort.to_s)
+				arg_string = Digest::SHA1.hexdigest(args.collect {|arg| Proxy === arg ? arg.object_id.to_s : arg.to_s}.sort.to_s)
 				"#{time_string}-#{arg_string}-#{rand(RandHigh).to_s(16)}"
 			end
 

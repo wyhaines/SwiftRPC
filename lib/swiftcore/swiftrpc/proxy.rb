@@ -17,6 +17,7 @@ require 'swiftcore/swiftrpc/proxy_connection'
 module Swiftcore
 	module SwiftRPC
 		BlankSlateTemplate::__MethodsToPreserve << :class
+		BlankSlateTemplate::__MethodsToPreserve << :respond_to?
 
 		class Proxy < BlankSlate
 
@@ -59,6 +60,7 @@ module Swiftcore
 
 			# TODO: The reconnect logic here is broken. It has a race condition. Fix it.
 			def method_missing(meth, *args, &block)
+				puts ":meth #{meth}(#{args.inspect})"
 				if __p_connected?
 					__initiate_invocation(meth, *args, &block)
 				else

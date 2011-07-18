@@ -1,5 +1,6 @@
 require 'em/deferrable'
 require 'swiftcore/swiftrpc/do_proxy'
+require 'socket'
 
 # This encapsulates the actual proxy connection. It is a module that is intended
 # to be used with EventMachine.
@@ -15,8 +16,8 @@ module Swiftcore
 				port = hash_args[:port] || args[1]
 				idle = hash_args[:idle] || args[2] || 60
 				conn = EventMachine.connect(address, port, ProxyConnection)
-			  conn.set_comm_inactivity_timeout(idle)
-			  conn
+				conn.comm_inactivity_timeout = idle
+				conn
 			end
 
 			def initialize(*args)
@@ -148,7 +149,7 @@ module Swiftcore
 			def invoke_on(proxy, signature, meth, *args)
 				@return_map[signature] = proxy
 				payload = [signature, meth, args]
-				flavor = args.respond_to?(:to_msgpack) ? :msgpack : :marshal
+				flavor = args.all? { |a| a.respond_to?(:to_msgpack) } ? :msgpack : :marshal
 				begin
 					case flavor
 						when :msgpack
@@ -182,8 +183,11 @@ module Swiftcore
 						end
 
 						if DoProxy === response
-							
+							port, addr = Socket::unpack_sockaddr_in(self.get_peername)
+							uuid = response.uuid
+							response = Proxy.new(addr, port, self.comm_inactivity_timeout, uuid)
 						end
+
 						proxy = @return_map.delete(signature)
 						proxy.__handle_response(signature, response) if proxy
 					else

@@ -11,6 +11,7 @@ class TC_Caller < Test::Unit::TestCase
 	KillQueue = []
 
 	def setup
+		@noderef = []
 		cwd = File.dirname(__FILE__)
 		ruby_cmd = "#{Ruby} -I#{cwd}/../lib"
 		KillQueue << SwiftcoreTestSupport::create_process(:dir => cwd, :cmd => "#{ruby_cmd} #{cwd}/helpers/test_server.rb")
@@ -61,16 +62,22 @@ class TC_Caller < Test::Unit::TestCase
 			end
 
 			EM::add_timer(1) do
-				tx.call_on('node1', :ref) do |node1_ref|
-					puts "got 1"
+				tx.call_on('node1', :ref) do |node|
+					@noderef[1] = node
+					node.value { |n| assert_equal("1", n, "Got the wrong value for #value from node1") }
+					node.name { |n| assert_equal('a', n, "Got the wrong value for #name from node1") }
 				end
 
-				tx.call_on('node2', :ref) do |node1_ref|
-					puts "got 2"
+				tx.call_on('node2', :ref) do |node|
+					@noderef[2] = node
+					node.value { |n| assert_equal("2", n, "Got the wrong value for #value from node2") }
+					node.name { |n| assert_equal('b', n, "Got the wrong value for #name from node1") }
 				end
 
-				tx.call_on('node3', :ref) do |node1_ref|
-					puts "got 3"
+				tx.call_on('node3', :ref) do |node|
+					@noderef[3] = node
+					node.value { |n| assert_equal("3", n, "Got the wrong value for #value from node3") }
+					node.name { |n| assert_equal('c', n, "Got the wrong value for #name from node1") }
 				end
 			end
 
@@ -89,8 +96,21 @@ class TC_Caller < Test::Unit::TestCase
 				end
 			end
 
+			EM::add_timer(2) do
+				n1 = @noderef[1]
+				n2 = @noderef[2]
+				n1.next = n2
+				@noderef[1].next = @noderef[2]
+				@noderef[2].prior= @noderef[1]
+				@noderef[2].next= @noderef[3]
+				@noderef[3].prior= @noderef[2]
+			end
+
+			EM::add_timer(3) do
+				@noderef[1].next {|n| n.next {|n| n.next {|n| puts "***** #{n.value}"}}}
+			end
 			# Trigger an exception by calling a method that does not exist; exception should propagate back to the caller.
-			EM::add_timer(3) { EM.stop_event_loop }
+			EM::add_timer(5) { EM.stop_event_loop }
 		}
 		assert tests_finished[:connected_5555], "Did not receive affirmation that the client connected to the general test server."
 		assert tests_finished[:connected_5556], "Did not receive affirmation that the client connected to the node1 server."
